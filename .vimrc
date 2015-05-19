@@ -1,33 +1,181 @@
-set nocompatible              " be iMproved, required
-filetype off                  " required
+set nocompatible
+filetype off
 
-" set the runtime path to include Vundle and initialize
-set rtp+=~/.vim/bundle/Vundle.vim
-call vundle#begin()
-" alternatively, pass a path where Vundle should install plugins
-"call vundle#begin('~/some/path/here')
+" Setting up Vundle - the vim plugin bundler
+" Credit:  http://www.erikzaadi.com/2012/03/19/auto-installing-vundle-from-your-vimrc/
+let iCanHazNeoBundle=1
+let neobundle_readme=expand('~/.vim/bundle/neobundle.vim/README.md')
+if !filereadable(neobundle_readme)
+  echo "Installing neobundle.vim."
+  echo ""
+  silent !mkdir -p ~/.vim/bundle
+  silent !git clone https://github.com/Shougo/neobundle.vim ~/.vim/bundle/neobundle.vim
+  let iCanHazNeoBundle=0
+endif
 
-" let Vundle manage Vundle, required
-Plugin 'gmarik/Vundle.vim'
+set rtp+=~/.vim/bundle/neobundle.vim/
+
+call neobundle#begin(expand('~/.vim/bundle/'))
+
+
+" Let NeoBundle manage NeoBundle
+NeoBundleFetch 'Shougo/neobundle.vim'
+
+" Recommended to install
+" After install, turn shell ~/.vim/bundle/vimproc, (n,g)make -f your_machines_makefile
+
+let g:make = 'gmake'
+if system('uname -o') =~ '^GNU/'
+  let g:make = 'make'
+endif
+
+NeoBundle 'Shougo/vimproc', { 'build': {
+      \   'windows' : 'tools\\update-dll-mingw',
+      \   'cygwin': 'make -f make_cygwin.mak',
+      \   'mac': 'make -f make_mac.mak',
+      \   'unix': g:make,
+      \ } }
+
+
+
 
 " rust lang support
-Plugin 'rust-lang/rust.vim'
+NeoBundle 'rust-lang/rust.vim'
 
 "coffee script support
-Plugin 'kchmck/vim-coffee-script'
+NeoBundle 'kchmck/vim-coffee-script'
+
+NeoBundle 'phildawes/racer', {
+\   'build' : {
+\     'mac': 'cargo build --release',
+\     'unix': 'cargo build --release',
+\   }
+\ }
+
+  NeoBundleLazy 'Shougo/neocomplete.vim', { 'autoload' : { 'insert' : '1' }, 'disabled' : (!has('lua')) }
+
+if iCanHazNeoBundle == 0
+  echo "Installing Bundles, please ignore key map error messages"
+  echo ""
+  :NeoBundleInstall
+endif
+" Setting up Vundle - the vim plugin bundler end
+
+call neobundle#end()
+
+
+" Needed for Syntax Highlighting and stuff
+filetype plugin indent on
+syntax enable
+
+" Installation check.
+NeoBundleCheck
+
+
+
+
+if neobundle#tap('neocomplete.vim')
+  function! neobundle#hooks.on_source(bundle)
+
+    let g:neocomplete#enable_at_startup = 1
+    let g:neocomplete#enable_smart_case = 1
+    let g:neocomplete#enable_auto_delimiter = 1
+    let g:neocomplete#max_list = 15
+    let g:neocomplete#force_overwrite_completefunc = 1
+
+
+    " Define dictionary.
+    let g:neocomplete#sources#dictionary#dictionaries = {
+          \ 'default' : '',
+          \ 'vimshell' : $HOME.'/.vimshell_hist',
+          \ 'scheme' : $HOME.'/.gosh_completions'
+          \ }
+
+    " Define keyword.
+    if !exists('g:neocomplete#keyword_patterns')
+      let g:neocomplete#keyword_patterns = {}
+    endif
+    let g:neocomplete#keyword_patterns['default'] = ''
+
+    " Plugin key-mappings {
+    " These two lines conflict with the default digraph mapping of <C-K>
+    if !exists('g:spf13_no_neosnippet_expand')
+      imap <C-k> <Plug>(neosnippet_expand_or_jump)
+      smap <C-k> <Plug>(neosnippet_expand_or_jump)
+    endif
+    if exists('g:spf13_noninvasive_completion')
+      inoremap <CR> <CR>
+      " <ESC> takes you out of insert mode
+      inoremap <expr> <Esc>   pumvisible() ? "\<C-y>\<Esc>" : "\<Esc>"
+      " <CR> accepts first, then sends the <CR>
+      inoremap <expr> <CR>    pumvisible() ? "\<C-y>\<CR>" : "\<CR>"
+      " <Down> and <Up> cycle like <Tab> and <S-Tab>
+      inoremap <expr> <Down>  pumvisible() ? "\<C-n>" : "\<Down>"
+      inoremap <expr> <Up>    pumvisible() ? "\<C-p>" : "\<Up>"
+      " Jump up and down the list
+      inoremap <expr> <C-d>   pumvisible() ? "\<PageDown>\<C-p>\<C-n>" : "\<C-d>"
+      inoremap <expr> <C-u>   pumvisible() ? "\<PageUp>\<C-p>\<C-n>" : "\<C-u>"
+    else
+      " <C-k> Complete Snippet
+      " <C-k> Jump to next snippet point
+      imap <silent><expr><C-k> neosnippet#expandable() ?
+            \ "\<Plug>(neosnippet_expand_or_jump)" : (pumvisible() ?
+            \ "\<C-e>" : "\<Plug>(neosnippet_expand_or_jump)")
+      smap <TAB> <Right><Plug>(neosnippet_jump_or_expand)
+
+      inoremap <expr><C-g> neocomplete#undo_completion()
+      inoremap <expr><C-l> neocomplete#complete_common_string()
+      "inoremap <expr><CR> neocomplete#complete_common_string()
+
+      " <CR>: close popup
+      " <s-CR>: close popup and save indent.
+      inoremap <expr><s-CR> pumvisible() ? neocomplete#smart_close_popup()."\<CR>" : "\<CR>"
+
+      " <C-h>, <BS>: close popup and delete backword char.
+      inoremap <expr><BS> neocomplete#smart_close_popup()."\<C-h>"
+      inoremap <expr><C-y> neocomplete#smart_close_popup()
+    endif
+    " <TAB>: completion.
+    inoremap <expr><TAB> pumvisible() ? "\<C-n>" : "\<TAB>"
+    inoremap <expr><S-TAB> pumvisible() ? "\<C-p>" : "\<TAB>"
+
+    " }
+
+    " Enable heavy omni completion.
+    if !exists('g:neocomplete#sources#omni#input_patterns')
+      let g:neocomplete#sources#omni#input_patterns = {}
+    endif
+    let g:neocomplete#sources#omni#input_patterns.php = '[^. \t]->\h\w*\|\h\w*::'
+    let g:neocomplete#sources#omni#input_patterns.perl = '\h\w*->\h\w*\|\h\w*::'
+    let g:neocomplete#sources#omni#input_patterns.c = '[^.[:digit:] *\t]\%(\.\|->\)'
+    let g:neocomplete#sources#omni#input_patterns.cpp = '[^.[:digit:] *\t]\%(\.\|->\)\|\h\w*::'
+    let g:neocomplete#sources#omni#input_patterns.ruby = '[^. *\t]\.\h\w*\|\h\w*::'
+
+    " <CR>: close popup and save indent.
+    inoremap <silent> <CR> <C-r>=<SID>my_cr_function()<CR>
+    function! s:my_cr_function()
+      return neocomplete#smart_close_popup() . "\<CR>"
+      " For no inserting <CR> key.
+      "return pumvisible() ? neocomplete#close_popup() : "\<CR>"
+    endfunction
+
+    call neocomplete#custom#source('buffer', 'disabled', 1)
+    call neocomplete#custom#source('vim', 'disabled', 1)
+
+  endfunction
+
+  call neobundle#untap()
+endif
+
+
+
+
+
+
+
 
 syntax enable
 " All of your Plugins must be added before the following line
-call vundle#end()            " required
 filetype plugin indent on    " required
 " To ignore plugin indent changes, instead use:
 "filetype plugin on
-"
-" Brief help
-" :PluginList       - lists configured plugins
-" :PluginInstall    - installs plugins; append `!` to update or just :PluginUpdate
-" :PluginSearch foo - searches for foo; append `!` to refresh local cache
-" :PluginClean      - confirms removal of unused plugins; append `!` to auto-approve removal
-"
-" see :h vundle for more details or wiki for FAQ
-" Put your non-Plugin stuff after this line
